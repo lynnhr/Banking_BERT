@@ -36,7 +36,7 @@ Y=le.fit_transform(y)
 print(Y)
 ```
 
-##Bernouilli (82%)
+## Bernouilli (82%)
 ```python
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import BernoulliNB
@@ -90,7 +90,7 @@ accuracy = accuracy_score(y_test, y_pred)
 print(f"Accuracy: {accuracy:.4f}")
 ```
 
-##GridSearch Logistic regression (86%)
+## GridSearch Logistic regression (86%)
 ```python
 # Import necessary libraries
 import numpy as np
@@ -167,7 +167,7 @@ import joblib
 joblib.dump(grid_search, 'text_classification_model.pkl')
 ```
 
-##RandomFOrest (79%)
+## RandomFOrest (79%)
 ```python
 # Import necessary libraries
 import pandas as pd
@@ -227,7 +227,7 @@ print(classification_report(y_test, y_pred, target_names=label_encoder.classes_)
 
 ```
 
-##Bert
+## Bert
 ```python
 ```
 
