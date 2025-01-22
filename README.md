@@ -13,3 +13,17 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 ```
+2- Split the dataset into x (features) and y (dependent variable)
+```python
+dataset=pd.read_csv('train.csv')
+x=dataset.iloc[:, :-1].values // : range select all rows
+y=dataset.iloc[:,-1].values  // -1 means the last row
+```
+3- Check for null values
+```python
+dataset.info()
+dataset.isnull().sum()
+```
+![Image](https://github.com/user-attachments/assets/b985ce71-3ce0-417e-ae47-97d1010b85d5)
+
+
