@@ -16,8 +16,8 @@ import matplotlib.pyplot as plt
 2- Split the dataset into x (features) and y (dependent variable)
 ```python
 dataset=pd.read_csv('train.csv')
-x=dataset.iloc[:, :-1].values // : range select all rows
-y=dataset.iloc[:,-1].values  // -1 means the last row
+x=dataset.iloc[:, :-1].values # : range select all rows
+y=dataset.iloc[:,-1].values   # -1 means the last row
 ```
 3- Check for null values
 ```python
@@ -25,5 +25,27 @@ dataset.info()
 dataset.isnull().sum()
 ```
 ![Image](https://github.com/user-attachments/assets/b985ce71-3ce0-417e-ae47-97d1010b85d5)
+
+4- Encoding the independent variable
+```python
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder
+#create object of class()
+#transformer takes 3 arguments: kind of transformation(here encoding),what kind of encoding ,index of columns
+#remainder what we don't want to encode
+ct=ColumnTransformer(transformers=[('encoder', OneHotEncoder(),[0])],remainder="passthrough")    
+# np.array ensures that the result is converted into a NumPy array
+X=np.array(ct.fit_transform(x)) #X the new x updated
+print(X)
+```
+![Image](https://github.com/user-attachments/assets/134f8b04-db5f-45ca-9840-b2762dcb8925)
+
+5- Encode Dependent Variable
+```python
+from sklearn.preprocessing import LabelEncoder
+le=LabelEncoder()
+Y=le.fit_transform(y)
+print(Y)
+```
 
 
