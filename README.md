@@ -115,7 +115,8 @@ trainer = Trainer(
 ```python
 trainer.train()
 ```
-![Image](https://github.com/user-attachments/assets/06677d8f-5a76-4102-9248-2073eaff4d97)
+![Image](https://github.com/user-attachments/assets/23c0cd3a-6a4d-48f7-b18e-e8c0fee5b039)
+
 12- Evaluate the model
 ```python
 predictions = trainer.predict(test_dataset)
