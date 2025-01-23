@@ -38,7 +38,6 @@ print(test_df.head())
 
 4- Check for null values
 ```python
-# Check for missing values
 print("\nMissing Values in Training Data:")
 print(train_df.isnull().sum())
 
