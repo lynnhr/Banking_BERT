@@ -168,7 +168,7 @@ plt.grid(True)
 plt.show()
 ```
 ![Image](https://github.com/user-attachments/assets/99846326-5617-42f7-9741-84131a14e05d)
-16- Visualize Learning Rat
+16- Visualize Learning Rate
 ```python
 import matplotlib.pyplot as plt
 import seaborn as sns
