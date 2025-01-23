@@ -4,37 +4,250 @@
 ![Pandas](https://img.shields.io/badge/pandas-%23150458.svg?style=for-the-badge&logo=pandas&logoColor=white)
 ![NumPy](https://img.shields.io/badge/numpy-%23013243.svg?style=for-the-badge&logo=numpy&logoColor=white)
 ![Matplotlib](https://img.shields.io/badge/Matplotlib-%23ffffff.svg?style=for-the-badge&logo=Matplotlib&logoColor=black)
-![Plotly](https://img.shields.io/badge/Plotly-%233F4F75.svg?style=for-the-badge&logo=plotly&logoColor=white)
 ![scikit-learn](https://img.shields.io/badge/scikit--learn-%23F7931E.svg?style=for-the-badge&logo=scikit-learn&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-%23EE4C2C.svg?style=for-the-badge&logo=PyTorch&logoColor=white)
+
+Model: BERT from transformers 
+training time:4 hours
 
 1- Import important libraries
 ```python
-import numpy as np
+!pip install transformers datasets accelerate
 import pandas as pd
-import matplotlib.pyplot as plt
-```
-
-2- Check for null values
-```python
-dataset.info()
-dataset.isnull().sum()
-```
-![Image](https://github.com/user-attachments/assets/b985ce71-3ce0-417e-ae47-97d1010b85d5)
-
-3- Split the dataset into x (features) and y (dependent variable)
-```python
-dataset=pd.read_csv('train.csv')
-x=dataset.iloc[:, :-1].values # : range select all rows
-y=dataset.iloc[:,-1].values   # -1 means the last row
-```
-
-4- Encode Dependent Variable
-```python
+import numpy as np
 from sklearn.preprocessing import LabelEncoder
-le=LabelEncoder()
-Y=le.fit_transform(y)
-print(Y)
+from sklearn.metrics import accuracy_score, classification_report
+from transformers import BertTokenizer, BertForSequenceClassification, Trainer, TrainingArguments
+import torch
+from torch.utils.data import Dataset
 ```
+2- Load datasets
+```python
+train_df = pd.read_csv('train.csv')  
+test_df = pd.read_csv('test.csv')    
+```
+3- Print first few rows
+```python
+print("Training Data:")
+print(train_df.head())
+
+print("\nTesting Data:")
+print(test_df.head())
+```
+![Image](https://github.com/user-attachments/assets/c7f1ce41-3372-4703-aeec-454f853e73fa)
+
+4- Check for null values
+```python
+# Check for missing values
+print("\nMissing Values in Training Data:")
+print(train_df.isnull().sum())
+
+print("\nMissing Values in Testing Data:")
+print(test_df.isnull().sum())
+```
+![Image](https://github.com/user-attachments/assets/5fc3a8b6-5840-43e9-a6df-fd1be80a5afa)
+
+5- Encode Dependent Variable
+```python
+label_encoder = LabelEncoder()
+y_train = label_encoder.fit_transform(train_df['category'])
+y_test = label_encoder.transform(test_df['category'])
+```
+6-Tokenize data (independent variable)
+```python
+tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')  # load BERT tokenizer
+
+train_encodings = tokenizer(train_df['text'].tolist(), truncation=True, padding=True, max_length=64)
+test_encodings = tokenizer(test_df['text'].tolist(), truncation=True, padding=True, max_length=64)
+```
+7- Convert to Pytorch dataset, before passing the data to the model
+```python
+class TextDataset(Dataset):
+    def __init__(self, encodings, labels): #__init__ initializes the dataset with encodings and labels
+        self.encodings = encodings
+        self.labels = labels
+
+    def __getitem__(self, idx): # __getitem__ retrieves a single data sample at a given index
+        item = {key: torch.tensor(val[idx]).to(device) for key, val in self.encodings.items()}  # .to(device) is used when working with gpu instead of cpu (gpu is better and faster for tranformers models)
+        item['labels'] = torch.tensor(self.labels[idx]).to(device)  # toech.tensor() converts them to pytorch tensors, idx is the index
+        return item
+
+    def __len__(self): 
+        return len(self.labels) #returns length of labels list
+
+train_dataset = TextDataset(train_encodings, y_train)
+test_dataset = TextDataset(test_encodings, y_test)
+```
+
+8- Load BERT model
+this model from transformers is used for predicting categories or labels
+```python
+model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=len(label_encoder.classes_)).to(device)
+#'bert-base-uncased' base refers to the smallest version of the model, uncased means the tokenizer will convert the text to lowercase andd ignore case sensitivity
+#num_labels=len(label_encoder.classes_) label_encoder.classes_ stores the unique labels in the dataset
+```
+9- Define Training arguments
+```python
+training_args = TrainingArguments(
+    output_dir='./results',          # output directory: after training the model and logs will be saved in 'results' folder
+    num_train_epochs=3,              # number of epochs: an epoch is a full pass through the training data
+    per_device_train_batch_size=16,  # batch: chunk of data processed
+    per_device_eval_batch_size=16,   
+    warmup_steps=500,                
+    weight_decay=0.01,              
+    logging_dir='./logs',            # logs will be stores in this directory, a log is a messages recorded during the execution of a program
+    logging_steps=10,                # log every 10 steps
+    evaluation_strategy="epoch",     # evaluate after each epoch
+    save_strategy="epoch",           # save model after each epoch
+    load_best_model_at_end=True,     # load the best model at the end
+    report_to="none",                # disable wandb, i disabled this becuase it asked to create an account in wandb and enter the API
+    fp16=True,                       
+)
+```
+10- Define trainer
+```python
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=train_dataset,
+    eval_dataset=test_dataset,
+```
+11- Train
+```python
+trainer.train()
+```
+![Image](https://github.com/user-attachments/assets/06677d8f-5a76-4102-9248-2073eaff4d97)
+12- Evaluate the model
+```python
+predictions = trainer.predict(test_dataset)
+y_pred = np.argmax(predictions.predictions, axis=-1)
+```
+13- Calculate the accuracy 
+```python
+accuracy = accuracy_score(y_test, y_pred) # we calculate the accuracy by using the test and predictions
+print(f"\nTest Accuracy: {accuracy:.4f}")
+```
+![Image](https://github.com/user-attachments/assets/b7b39c02-7967-4009-a966-c52ce6d05a88)
+
+14- Print the classification report
+```python
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred, target_names=label_encoder.classes_))
+```
+![Image](https://github.com/user-attachments/assets/0f2760e0-2c9c-4bec-b292-284b89f18b92)
+![Image](https://github.com/user-attachments/assets/7bd1c861-7541-411e-b930-02df5195442e)
+
+15- Visualize Training and Evaluation Loss
+    using log history
+```python
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+history = trainer.state.log_history #extract training history
+
+# extract training and evaluation metrics
+train_loss = [entry['loss'] for entry in history if 'loss' in entry]
+eval_loss = [entry['eval_loss'] for entry in history if 'eval_loss' in entry]
+
+# calculate the number of steps per epoch
+steps_per_epoch = len(train_loss) // len(eval_loss)
+
+# create x axis
+train_steps = list(range(len(train_loss))) #generates a list of integers 0,1,2... corresponding to each training step.
+eval_steps = [steps_per_epoch * (i + 1) for i in range(len(eval_loss))]
+
+# plot
+plt.figure(figsize=(10, 5))
+plt.plot(train_steps, train_loss, label='Training Loss', marker='', linestyle='-') #y axis train loss
+plt.plot(eval_steps, eval_loss, label='Evaluation Loss', marker='o', linestyle='--')
+plt.xlabel('Training Steps')
+plt.ylabel('Loss')
+plt.title('Training and Evaluation Loss Over Steps')
+plt.legend()
+plt.grid(True)
+plt.show()
+```
+![Image](https://github.com/user-attachments/assets/99846326-5617-42f7-9741-84131a14e05d)
+16- Visualize Learning Rat
+```python
+import matplotlib.pyplot as plt
+import seaborn as sns
+history = trainer.state.log_history
+learning_rates = [entry['learning_rate'] for entry in history if 'learning_rate' in entry]
+
+plt.figure(figsize=(10, 5))
+plt.plot(range(len(learning_rates)), learning_rates, label='Learning Rate', marker='')
+plt.xlabel('Training Steps')
+plt.ylabel('Learning Rate')
+plt.title('Learning Rate Schedule Over Steps')
+plt.legend()
+plt.grid(True)
+plt.show()
+```
+![Image](https://github.com/user-attachments/assets/9e27f630-84de-412c-80b7-290c0ffa6f40)
+
+17- Save thye model+ tokenizer+ label_encoder
+    this model is most suitable for tranformers models
+```python
+model.save_pretrained('./saved_model')
+tokenizer.save_pretrained('./saved_tokenizer')
+
+#zip the files before downloading them
+!zip -r saved_model.zip ./saved_model
+!zip -r saved_tokenizer.zip ./saved_tokenizer
+
+from google.colab import files
+files.download('saved_model.zip')
+files.download('saved_tokenizer.zip')
+
+#use .pkl for label_encoder
+import pickle
+with open('label_encoder.pkl', 'wb') as f:
+    pickle.dump(label_encoder, f)
+```
+
+18- Load the trained  model in pycharm to test and predict 
+```python
+import torch
+from transformers import BertForSequenceClassification, BertTokenizer
+from sklearn.preprocessing import LabelEncoder  # Import LabelEncoder
+import pickle
+
+model = BertForSequenceClassification.from_pretrained('saved_model')
+tokenizer = BertTokenizer.from_pretrained('saved_tokenizer')
+with open('label_encoder.pkl', 'rb') as f:
+    label_encoder = pickle.load(f)
+
+# print the class names
+print("Label Mapping:")
+for i, class_name in enumerate(label_encoder.classes_):
+    print(f"{i}: {class_name}")
+
+
+def predict(text):
+    # tokenize the input text
+    inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=64)
+
+    
+    with torch.no_grad():
+        outputs = model(**inputs)
+
+    
+    logits = outputs.logits  #higher logits generally correspond to higher confidence for that class.
+    predicted_class = torch.argmax(logits, dim=-1).item()  #torch.argmax(logits, dim=-1) identifies the index of the highest value   .item():converts tensor result into a python scalar(example:0,1..)
+
+    return predicted_class
+
+
+sample_text = "i want to change my card"
+predicted_label = predict(sample_text)
+
+print(f"Predicted Label: {predicted_label}")
+print(f"Predicted Class: {label_encoder.classes_[predicted_label]}")
+```
+![Image](https://github.com/user-attachments/assets/dc2b1706-96b5-43ca-82f5-ead4320226d6)
+
+#Performed Traning with other models but accuracy<90%
 
 ## Bernouilli (82%)
 ```python
@@ -49,50 +262,44 @@ import nltk
 train_df = pd.read_csv('train.csv')
 test_df = pd.read_csv('test.csv')
 
-# Initialize the lemmatizer
+
 lemmatizer = WordNetLemmatizer()
 
-# Function to preprocess text
+
 def preprocess_text(text):
-    # Convert to lowercase
     text = text.lower()
-    # Remove special characters and numbers
     text = re.sub(r'[^a-zA-Z\s]', '', text)
-    # Tokenize the text
     tokens = word_tokenize(text)
-    # Lemmatize tokens
     tokens = [lemmatizer.lemmatize(word) for word in tokens]
-    # Join tokens back into a string
     return ' '.join(tokens)
 
-# Apply preprocessing to the text data
+
 train_df['text'] = train_df['text'].apply(preprocess_text)
 test_df['text'] = test_df['text'].apply(preprocess_text)
 
-# Convert text data into numerical features using TfidfVectorizer
+
 vectorizer = TfidfVectorizer(binary=True, stop_words='english', max_features=5000)
 X_train = vectorizer.fit_transform(train_df['text'])
 X_test = vectorizer.transform(test_df['text'])
 
-# Encode the target variable (labels)
+
 y_train = train_df['category']
 y_test = test_df['category']
 
-# Train a Bernoulli Naive Bayes model
-bnb = BernoulliNB(alpha=0.1)  # Using a fixed alpha value for simplicity
+
+bnb = BernoulliNB(alpha=0.1)  
 bnb.fit(X_train, y_train)
 
-# Predict the labels for the test set
+
 y_pred = bnb.predict(X_test)
 
-# Calculate the accuracy of the model
+
 accuracy = accuracy_score(y_test, y_pred)
 print(f"Accuracy: {accuracy:.4f}")
 ```
 
 ## GridSearch Logistic regression (86%)
 ```python
-# Import necessary libraries
 import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -102,40 +309,40 @@ from sklearn.pipeline import Pipeline
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import accuracy_score, classification_report
 
-# Load the training and testing datasets
-train_df = pd.read_csv('train.csv')  # Replace with your training data path
-test_df = pd.read_csv('test.csv')    # Replace with your testing data path
 
-# Display the first few rows of the datasets
+train_df = pd.read_csv('train.csv') 
+test_df = pd.read_csv('test.csv')    
+
+
 print("Training Data:")
 print(train_df.head())
 
 print("\nTesting Data:")
 print(test_df.head())
 
-# Check for missing values
+
 print("\nMissing Values in Training Data:")
 print(train_df.isnull().sum())
 
 print("\nMissing Values in Testing Data:")
 print(test_df.isnull().sum())
 
-# Drop rows with missing values (if any)
+
 train_df = train_df.dropna()
 test_df = test_df.dropna()
 
-# Encode the target variable (labels)
+
 label_encoder = LabelEncoder()
 y_train = label_encoder.fit_transform(train_df['category'])
 y_test = label_encoder.transform(test_df['category'])
 
-# Create a pipeline with TfidfVectorizer and LogisticRegression
+
 pipeline = Pipeline([
     ('tfidf', TfidfVectorizer(binary=True, stop_words='english', ngram_range=(1, 2), max_features=5000)),
     ('clf', LogisticRegression(max_iter=1000))  # Increase max_iter for convergence
 ])
 
-# Define the parameter grid for GridSearchCV
+
 param_grid = {
     'tfidf__max_features': [5000, 10000],  # Experiment with more features
     'tfidf__ngram_range': [(1, 1), (1, 2)],  # Try unigrams and bigrams
@@ -143,33 +350,31 @@ param_grid = {
     'clf__penalty': ['l2'],  # L2 regularization is common for Logistic Regression
 }
 
-# Perform grid search
+
 grid_search = GridSearchCV(pipeline, param_grid, cv=3, scoring='accuracy', verbose=1)
 grid_search.fit(train_df['text'], y_train)
 
-# Print the best parameters and accuracy
+
 print(f"\nBest Parameters: {grid_search.best_params_}")
 print(f"Best Cross-Validation Accuracy: {grid_search.best_score_:.4f}")
 
-# Predict the labels for the test set
+
 y_pred = grid_search.predict(test_df['text'])
 
-# Calculate the accuracy of the model
+
 accuracy = accuracy_score(y_test, y_pred)
 print(f"\nTest Accuracy: {accuracy:.4f}")
 
-# Print the classification report
+
 print("\nClassification Report:")
 print(classification_report(y_test, y_pred, target_names=label_encoder.classes_))
 
-# Save the model (optional)
 import joblib
 joblib.dump(grid_search, 'text_classification_model.pkl')
 ```
 
-## RandomFOrest (79%)
+## RandomForest (79%)
 ```python
-# Import necessary libraries
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -178,258 +383,53 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import accuracy_score, classification_report
 
-# Load the training and testing datasets
-train_df = pd.read_csv('train.csv')  # Replace with your training data path
-test_df = pd.read_csv('test.csv')    # Replace with your testing data path
 
-# Display the first few rows of the datasets
+train_df = pd.read_csv('train.csv')  
+test_df = pd.read_csv('test.csv')    
+
+
 print("Training Data:")
 print(train_df.head())
 
 print("\nTesting Data:")
 print(test_df.head())
 
-# Check for missing values
+
 print("\nMissing Values in Training Data:")
 print(train_df.isnull().sum())
 
 print("\nMissing Values in Testing Data:")
 print(test_df.isnull().sum())
 
-# Drop rows with missing values (if any)
+
 train_df = train_df.dropna()
 test_df = test_df.dropna()
 
-# Encode the target variable (labels)
+
 label_encoder = LabelEncoder()
 y_train = label_encoder.fit_transform(train_df['category'])
 y_test = label_encoder.transform(test_df['category'])
 
-# Create a pipeline with TfidfVectorizer and Random Forest
+
 pipeline = Pipeline([
-    ('tfidf', TfidfVectorizer(stop_words='english', ngram_range=(1, 2), max_features=10000)),  # Use more features
-    ('clf', RandomForestClassifier(n_estimators=200, max_depth=20, random_state=42))  # Tune these parameters
+    ('tfidf', TfidfVectorizer(stop_words='english', ngram_range=(1, 2), max_features=10000)), 
+    ('clf', RandomForestClassifier(n_estimators=200, max_depth=20, random_state=42))  
 ])
 
-# Train the model
+
 pipeline.fit(train_df['text'], y_train)
 
-# Predict the labels for the test set
+
 y_pred = pipeline.predict(test_df['text'])
 
-# Calculate the accuracy of the model
+
 accuracy = accuracy_score(y_test, y_pred)
 print(f"\nTest Accuracy: {accuracy:.4f}")
 
-# Print the classification report
+
 print("\nClassification Report:")
 print(classification_report(y_test, y_pred, target_names=label_encoder.classes_))
 
 ```
-
-## Bert
-```python
-# Install required libraries
-!pip install transformers datasets accelerate
-
-import pandas as pd
-import numpy as np
-from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import accuracy_score, classification_report
-from transformers import BertTokenizer, BertForSequenceClassification, Trainer, TrainingArguments
-import torch
-from torch.utils.data import Dataset
-
-# Check if GPU is available
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Using device: {device}")
-
-# Load the training and testing datasets
-train_df = pd.read_csv('train.csv')  # Replace with your training data path
-test_df = pd.read_csv('test.csv')    # Replace with your testing data path
-
-# Display the first few rows of the datasets
-print("Training Data:")
-print(train_df.head())
-
-print("\nTesting Data:")
-print(test_df.head())
-
-# Check for missing values
-print("\nMissing Values in Training Data:")
-print(train_df.isnull().sum())
-
-print("\nMissing Values in Testing Data:")
-print(test_df.isnull().sum())
-
-# Drop rows with missing values (if any)
-train_df = train_df.dropna()
-test_df = test_df.dropna()
-
-# Encode the target variable (labels)
-label_encoder = LabelEncoder()
-y_train = label_encoder.fit_transform(train_df['category'])
-y_test = label_encoder.transform(test_df['category'])
-
-# Load BERT tokenizer
-tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-
-# Tokenize the data with reduced max_length
-train_encodings = tokenizer(train_df['text'].tolist(), truncation=True, padding=True, max_length=64)
-test_encodings = tokenizer(test_df['text'].tolist(), truncation=True, padding=True, max_length=64)
-
-# Convert to PyTorch datasets
-class TextDataset(Dataset):
-    def __init__(self, encodings, labels):
-        self.encodings = encodings
-        self.labels = labels
-
-    def __getitem__(self, idx):
-        item = {key: torch.tensor(val[idx]).to(device) for key, val in self.encodings.items()}  # Move data to GPU
-        item['labels'] = torch.tensor(self.labels[idx]).to(device)  # Move labels to GPU
-        return item
-
-    def __len__(self):
-        return len(self.labels)
-
-train_dataset = TextDataset(train_encodings, y_train)
-test_dataset = TextDataset(test_encodings, y_test)
-
-# Load BERT model and move it to GPU
-model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=len(label_encoder.classes_)).to(device)
-
-# Define training arguments with GPU and mixed precision
-training_args = TrainingArguments(
-    output_dir='./results',          # Output directory
-    num_train_epochs=3,              # Number of training epochs
-    per_device_train_batch_size=16,  # Batch size for training
-    per_device_eval_batch_size=16,   # Batch size for evaluation
-    warmup_steps=500,                # Number of warmup steps
-    weight_decay=0.01,               # Strength of weight decay
-    logging_dir='./logs',            # Directory for storing logs
-    logging_steps=10,                # Log every 10 steps
-    evaluation_strategy="epoch",     # Evaluate after each epoch
-    save_strategy="epoch",           # Save model after each epoch
-    load_best_model_at_end=True,     # Load the best model at the end
-    report_to="none",                # Disable wandb
-    fp16=True,                       # Enable mixed precision
-)
-
-# Define Trainer
-trainer = Trainer(
-    model=model,
-    args=training_args,
-    train_dataset=train_dataset,
-    eval_dataset=test_dataset,
-)
-
-# Train the model
-trainer.train()
-
-# Evaluate the model
-predictions = trainer.predict(test_dataset)
-y_pred = np.argmax(predictions.predictions, axis=-1)
-
-# Calculate the accuracy of the model
-accuracy = accuracy_score(y_test, y_pred)
-print(f"\nTest Accuracy: {accuracy:.4f}")
-
-# Print the classification report
-print("\nClassification Report:")
-print(classification_report(y_test, y_pred, target_names=label_encoder.classes_))
-```
-download
-```python
-model.save_pretrained('./saved_model')
-tokenizer.save_pretrained('./saved_tokenizer')
-!zip -r saved_model.zip ./saved_model
-!zip -r saved_tokenizer.zip ./saved_tokenizer
-from google.colab import files
-
-# Download the model
-files.download('saved_model.zip')
-
-# Download the tokenizer
-#files.download('saved_tokenizer.zip')
-```
-
-```python
-import pickle
-
-# Save the label encoder
-with open('label_encoder.pkl', 'wb') as f:
-    pickle.dump(label_encoder, f)
-```
-visualization
-```python
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-# Ensure the trainer object is available
-if 'trainer' in globals():
-    print("Trainer object found. Proceeding to visualize metrics.")
-else:
-    print("Trainer object not found. Please ensure the model has been trained.")
-
-# Extract training history
-history = trainer.state.log_history
-
-# Extract training and evaluation metrics
-train_loss = [entry['loss'] for entry in history if 'loss' in entry]
-eval_loss = [entry['eval_loss'] for entry in history if 'eval_loss' in entry]
-
-# Calculate the number of steps per epoch
-steps_per_epoch = len(train_loss) // len(eval_loss)
-
-# Create x-axis values for training loss (steps)
-train_steps = list(range(len(train_loss)))
-
-# Create x-axis values for evaluation loss (epochs)
-eval_steps = [steps_per_epoch * (i + 1) for i in range(len(eval_loss))]
-
-# Plot training and evaluation loss
-plt.figure(figsize=(10, 5))
-plt.plot(train_steps, train_loss, label='Training Loss', marker='', linestyle='-')
-plt.plot(eval_steps, eval_loss, label='Evaluation Loss', marker='o', linestyle='--')
-plt.xlabel('Training Steps')
-plt.ylabel('Loss')
-plt.title('Training and Evaluation Loss Over Steps')
-plt.legend()
-plt.grid(True)
-plt.show()
-
-# Plot evaluation accuracy (if available)
-if 'eval_accuracy' in history[0]:
-    eval_accuracy = [entry['eval_accuracy'] for entry in history if 'eval_accuracy' in entry]
-    plt.figure(figsize=(10, 5))
-    plt.plot(eval_steps, eval_accuracy, label='Evaluation Accuracy', marker='o', color='green')
-    plt.xlabel('Training Steps')
-    plt.ylabel('Accuracy')
-    plt.title('Evaluation Accuracy Over Steps')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-else:
-    print("Evaluation accuracy not found in logs.")
-```
-learning rate
-```python
-import matplotlib.pyplot as plt
-import seaborn as sns
-history = trainer.state.log_history
-# Extract learning rates from the logs
-learning_rates = [entry['learning_rate'] for entry in history if 'learning_rate' in entry]
-
-# Plot learning rate schedule
-plt.figure(figsize=(10, 5))
-plt.plot(range(len(learning_rates)), learning_rates, label='Learning Rate', marker='')
-plt.xlabel('Training Steps')
-plt.ylabel('Learning Rate')
-plt.title('Learning Rate Schedule Over Steps')
-plt.legend()
-plt.grid(True)
-plt.show()
-```
-
 
 
