@@ -187,7 +187,7 @@ plt.show()
 ![Image](https://github.com/user-attachments/assets/9e27f630-84de-412c-80b7-290c0ffa6f40)
 
 17- Save thye model+ tokenizer+ label_encoder
-    this model is most suitable for tranformers models
+    this method is most suitable for tranformers models
 ```python
 model.save_pretrained('./saved_model')
 tokenizer.save_pretrained('./saved_tokenizer')
@@ -210,7 +210,7 @@ with open('label_encoder.pkl', 'wb') as f:
 ```python
 import torch
 from transformers import BertForSequenceClassification, BertTokenizer
-from sklearn.preprocessing import LabelEncoder  # Import LabelEncoder
+from sklearn.preprocessing import LabelEncoder  
 import pickle
 
 model = BertForSequenceClassification.from_pretrained('saved_model')
@@ -247,7 +247,7 @@ print(f"Predicted Class: {label_encoder.classes_[predicted_label]}")
 ```
 ![Image](https://github.com/user-attachments/assets/dc2b1706-96b5-43ca-82f5-ead4320226d6)
 
-#Performed Traning with other models but accuracy<90%
+# Performed Traning with other models but accuracy<90%
 
 ## Bernouilli (82%)
 ```python
